@@ -29,7 +29,7 @@
 			"tym": [
 				{
 					"type": "webview",
-					"id": "calicoColors.colorsView",
+					"id": "tym.collaborationView",
 					"name": "Tym"
 				}
 			]
