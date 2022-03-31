@@ -1,5 +1,6 @@
 import { API, Remote, Repository } from './git';
 import * as vscode from 'vscode';
+import { sendTelemetryData } from './util';
 
 interface IGithubRemoteInfo {
 	owner: string;
@@ -13,6 +14,7 @@ interface ISelectionInfo {
 }
 
 export async function getGithubLink(git: API) {
+	sendTelemetryData('getGithubLink called');
 	const repositories = git.repositories;
 	if (repositories.length <= 0) return;
 	const repository = repositories[0];

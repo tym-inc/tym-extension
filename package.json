@@ -82,6 +82,7 @@
 	},
 	"icon": "https://firebasestorage.googleapis.com/v0/b/tokyo-unity-328718.appspot.com/o/tym-128.png?alt=media&token=c348cb5b-7d1f-46b6-8291-5b25351a8ed7",
 	"dependencies": {
+		"axios": "^0.26.1",
 		"firebase": "^9.6.10"
 	}
 }
