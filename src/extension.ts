@@ -1,35 +1,37 @@
 import * as vscode from 'vscode';
 import { GitExtension } from './git';
 import cp = require('child_process');
+import { getGithubLink } from './link';
+import { TymCodeActionProvider } from './codeActionProvider';
 
 export function activate(context: vscode.ExtensionContext): void {
 	const gitExtension = vscode.extensions.getExtension<GitExtension>('vscode.git')?.exports;
 	const git = gitExtension?.getAPI(1);
 
 	if (git) {
+		const tymCodeActionProvider = new TymCodeActionProvider();
+		context.subscriptions.push(
+			vscode.commands.registerCommand('tymExtension.getGithubLink', () => getGithubLink(git)),
+			vscode.languages.registerCodeActionsProvider('*', tymCodeActionProvider)
+		);
 		console.log('cp', cp);
 	}
 
 	const provider = new TymViewProvider(context.extensionUri);
 
-	context.subscriptions.push(
-		vscode.window.registerWebviewViewProvider(TymViewProvider.viewType, provider)
-	);
+	context.subscriptions.push(vscode.window.registerWebviewViewProvider(TymViewProvider.viewType, provider));
 }
-
 
 class TymViewProvider implements vscode.WebviewViewProvider {
 	public static readonly viewType = 'tym.collaborationView';
 	private _view?: vscode.WebviewView;
 
-	constructor(
-		private readonly _extensionUri: vscode.Uri,
-	) { }
+	constructor(private readonly _extensionUri: vscode.Uri) {}
 
 	public resolveWebviewView(
 		webviewView: vscode.WebviewView,
 		_context: vscode.WebviewViewResolveContext,
-		_token: vscode.CancellationToken,
+		_token: vscode.CancellationToken
 	) {
 		this._view = webviewView;
 
@@ -37,20 +39,17 @@ class TymViewProvider implements vscode.WebviewViewProvider {
 			// Allow scripts in the webview
 			enableScripts: true,
 
-			localResourceRoots: [
-				this._extensionUri
-			]
+			localResourceRoots: [this._extensionUri]
 		};
 
 		webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 
-		webviewView.webview.onDidReceiveMessage(data => {
+		webviewView.webview.onDidReceiveMessage((data) => {
 			switch (data.type) {
-				case 'colorSelected':
-					{
-						vscode.window.activeTextEditor?.insertSnippet(new vscode.SnippetString(`#${data.value}`));
-						break;
-					}
+				case 'colorSelected': {
+					vscode.window.activeTextEditor?.insertSnippet(new vscode.SnippetString(`#${data.value}`));
+					break;
+				}
 			}
 		});
 	}
@@ -109,7 +108,6 @@ class TymViewProvider implements vscode.WebviewViewProvider {
 			</html>`;
 	}
 }
-
 
 function getNonce() {
 	let text = '';

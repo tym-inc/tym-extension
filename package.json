@@ -16,12 +16,27 @@
 	],
 	"main": "./out/extension.js",
 	"contributes": {
+		"commands": [
+			{
+				"command": "tymExtension.getGithubLink",
+				"title": "Get Github Link"
+			}
+		],
+		"menus": {
+			"editor/context": [
+				{
+					"when": "editorFocus",
+					"command": "tymExtension.getGithubLink",
+					"group": "6_copypath"
+				}
+			]
+		},
 		"viewsContainers": {
 			"activitybar": [
 				{
-				"id": "tym",
-				"title": "Tym",
-				"icon": "media/tym.svg"
+					"id": "tym",
+					"title": "Tym",
+					"icon": "media/tym.svg"
 				}
 			]
 		},
@@ -35,7 +50,9 @@
 			]
 		}
 	},
-	"extensionDependencies": ["vscode.git"],
+	"extensionDependencies": [
+		"vscode.git"
+	],
 	"scripts": {
 		"vscode:prepublish": "npm run compile",
 		"compile": "tsc -p ./",
