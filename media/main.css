@@ -2,39 +2,78 @@ body {
 	background-color: transparent;
 }
 
-.color-list {
-	list-style: none;
-	padding: 0;
+button.submit-question-btn {
+	background-color: rgb(16, 111, 16);
 }
 
-.color-entry {
-	width: 100%;
+button.submit-question-btn:hover {
+	background-color: rgb(21, 146, 21);
+}
+
+.new-question {
+	padding: 0.7rem;
+	border-style: solid;
+	border-width: 1px;
+	border-radius: 2px;
+	border-color: var(--vscode-input-border);
+}
+
+.flex {
 	display: flex;
-	margin-bottom: 0.4em;
-	border: 1px solid var(--vscode-input-border);
 }
 
-.color-preview {
-	width: 2em;
-	height: 2em;
+.flex-col {
+	flex-direction: column;
 }
 
-.color-preview:hover {
-	outline: inset white;
+.flex-row {
+	flex-direction: row;
 }
 
-.color-input {
-	display: block;
-	flex: 1;
-	width: 100%;
-	color: var(--vscode-input-foreground);
+.justify-between {
+	justify-content: space-between;
+}
+
+button.xout-btn {
+	height: 1.4rem;
+	width: 1.4rem;
+	padding: 1px 1px;
+	background-color: var(--vscode-button-secondaryBackground);
+}
+
+button.xout-btn:hover {
+	background-color: var(--vscode-button-secondaryHoverBackground);
+}
+
+.mt {
+	margin-top: 0.5rem;
+}
+
+.terminal-output {
+	margin-top: 0.2rem;
+	height: 10rem;
+}
+
+.snippet-hint {
+	margin-top: 0.2rem;
+	font-size: smaller;
+	opacity: 0.3;
+}
+
+.snippet {
 	background-color: var(--vscode-input-background);
-	border: none;
-	padding: 0 0.6em;
+	color: var(--vscode-input-foreground);
 }
 
-.add-color-button {
-	display: block;
-	border: none;
-	margin: 0 auto;
+.snippet-line {
+	text-overflow: ellipsis;
+	overflow: hidden;
+	white-space: nowrap;
+}
+
+.snippet-context .location {
+	font-size: smaller;
+	text-overflow: ellipsis;
+	overflow: hidden;
+	white-space: nowrap;
 }

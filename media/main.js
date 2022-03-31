@@ -1,99 +1,112 @@
-//@ts-check
-
 // This script will be run within the webview itself
 // It cannot access the main VS Code APIs directly.
 (function () {
     const vscode = acquireVsCodeApi();
 
-    const oldState = vscode.getState() || { colors: [] };
-
-    /** @type {Array<{ value: string }>} */
-    let colors = oldState.colors;
-
-    updateColorList(colors);
-
-    document.querySelector('.add-color-button').addEventListener('click', () => {
-        addColor();
-    });
+    const oldState = vscode.getState() || { newQuestionStarted: false, questionInputs: { description: '', terminalOutput: '' } };
+    let { newQuestionStarted, questionInputs } =  oldState;
+    // Get questions
+    vscode.postMessage({ type: 'getAskedQuestions' });
 
     // Handle messages sent from the extension to the webview
     window.addEventListener('message', event => {
         const message = event.data; // The json data that the extension sent
         switch (message.type) {
-            case 'addColor':
-                {
-                    addColor();
-                    break;
-                }
-            case 'clearColors':
-                {
-                    colors = [];
-                    updateColorList(colors);
-                    break;
-                }
-
+            case 'addCodeSnippet':
+                addCodeSnippet(message.value);
+                break;
+            case 'setAskedQuestions':
+                setAskedQuestions(message.value);
+                break;
         }
     });
 
-    /**
-     * @param {Array<{ value: string }>} colors
-     */
-    function updateColorList(colors) {
-        const ul = document.querySelector('.color-list');
-        ul.textContent = '';
-        for (const color of colors) {
-            const li = document.createElement('li');
-            li.className = 'color-entry';
+    // For asking new questions
+    const newQuestionDiv = document.querySelector('div.new-question');
+    const submitQuestionBtn = document.querySelector('button.submit-question-btn');
+    const createQuestionBtn = document.querySelector('button.create-question-btn');
+    const xoutBtn = document.querySelector('button.xout-btn');
 
-            const colorPreview = document.createElement('div');
-            colorPreview.className = 'color-preview';
-            colorPreview.style.backgroundColor = `#${color.value}`;
-            colorPreview.addEventListener('click', () => {
-                onColorClicked(color.value);
-            });
-            li.appendChild(colorPreview);
+    const descriptionInput = document.querySelector('textarea.description');
+    const terminalInput = document.querySelector('textarea.terminal-output');
 
-            const input = document.createElement('input');
-            input.className = 'color-input';
-            input.type = 'text';
-            input.value = color.value;
-            input.addEventListener('change', (e) => {
-                const value = e.target.value;
-                if (!value) {
-                    // Treat empty value as delete
-                    colors.splice(colors.indexOf(color), 1);
-                } else {
-                    color.value = value;
-                }
-                updateColorList(colors);
-            });
-            li.appendChild(input);
+    if (newQuestionStarted) {
+        newQuestionDiv.style = 'display: block';
+        createQuestionBtn.style = 'display: none;';
+    } else {
+        newQuestionDiv.style = 'display: none';
+        createQuestionBtn.style = 'display: block;';
+    }
 
-            ul.appendChild(li);
+    function openNewQuestion() {
+        createQuestionBtn.style = 'display: none';
+        newQuestionDiv.style = 'display: block';
+        newQuestionStarted = true;
+        vscode.setState({ newQuestionStarted, questionInputs });
+    }
+
+    createQuestionBtn.onclick = () => {
+        openNewQuestion();
+    };
+
+    function closeNewQuestion() {
+        createQuestionBtn.style = 'display: block';
+        newQuestionDiv.style = 'display: none';
+        descriptionInput.value = '';
+        terminalInput.value = '';
+        newQuestionStarted = false;
+        questionInputs = { description: '', terminalOutput: '' };
+        vscode.setState({ newQuestionStarted, questionInputs });   
+    }
+
+    xoutBtn.onclick = () => {
+        closeNewQuestion();
+    };
+
+    submitQuestionBtn.onclick = () => {
+        closeNewQuestion();
+    };
+
+    descriptionInput.value = questionInputs.description;
+    terminalInput.value = questionInputs.terminalOutput;
+
+    descriptionInput.oninput = (event) => {
+        questionInputs.description = event.target.value;
+        vscode.setState({ newQuestionStarted, questionInputs});
+    };
+    
+    terminalInput.oninput = (event) => {
+        questionInputs.terminalOutput = event.target.value;
+        vscode.setState({ newQuestionStarted, questionInputs});
+    };
+
+    function addCodeSnippet(snippet) {
+        if (!newQuestionStarted) {
+            openNewQuestion();      
+        }
+    }
+
+    // For setting asked questions
+    function setAskedQuestions(questions) {
+        const qDiv = document.querySelector('div.asked-questions');
+        // clear div
+        while (qDiv.firstChild) {
+            qDiv.removeChild(qDiv.firstChild);
         }
 
-        // Update the saved state
-        vscode.setState({ colors: colors });
+        for (const question of questions) {
+            createQuestionDiv(qDiv, question);
+        }
     }
 
-    /** 
-     * @param {string} color 
-     */
-    function onColorClicked(color) {
-        vscode.postMessage({ type: 'colorSelected', value: color });
-    }
+    function createQuestionDiv(parent, question) {
+        const questionDiv = document.createElement('div.question');
+        parent.appendChild(questionDiv);
+        questionDiv.innerHTML = `<div>
+            yoyo mao
+            ${question}
+        </div>`;
 
-    /**
-     * @returns string
-     */
-    function getNewCalicoColor() {
-        const colors = ['020202', 'f1eeee', 'a85b20', 'daab70', 'efcb99'];
-        return colors[Math.floor(Math.random() * colors.length)];
-    }
-
-    function addColor() {
-        colors.push({ value: getNewCalicoColor() });
-        updateColorList(colors);
     }
 }());
 

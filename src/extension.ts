@@ -1,9 +1,15 @@
 import * as vscode from 'vscode';
 import { GitExtension } from './git';
-import cp = require('child_process');
 import { getGithubLink } from './link';
 import { TymCodeActionProvider } from './codeActionProvider';
+import { initializeApp } from 'firebase/app';
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
+import { execSync } from 'child_process';
+import { TymViewProvider } from './webviewProvider';
+import { getNonce } from './util';
+import firebaseConfig from './config';
 
+	
 export function activate(context: vscode.ExtensionContext): void {
 	const gitExtension = vscode.extensions.getExtension<GitExtension>('vscode.git')?.exports;
 	const git = gitExtension?.getAPI(1);
@@ -14,106 +20,45 @@ export function activate(context: vscode.ExtensionContext): void {
 			vscode.commands.registerCommand('tymExtension.getGithubLink', () => getGithubLink(git)),
 			vscode.languages.registerCodeActionsProvider('*', tymCodeActionProvider)
 		);
-		console.log('cp', cp);
 	}
 
+	// Using firebase to store question data + get notifications when user visits the question
+	const app = initializeApp(firebaseConfig);
+	const auth = getAuth(app);
+
+	const tymConfig = vscode.workspace.getConfiguration('tym');
+	let email = tymConfig.get<string>('email');
+	let password = tymConfig.get<string>('password');
+	
+	// Automatically generate an email and password
+	if (!email || email.length === 0 || !password || password.length === 0) {
+		const gitEmail = execSync('git config user.email').toString().trim();
+		// rudimentary check for valid email
+		if (gitEmail.length > 0 && gitEmail.indexOf('@') > 0) {
+			email = gitEmail;
+		} else {
+			email = `${getNonce()}@anonymous.com`;
+		}
+		password = getNonce();
+		tymConfig.update('email', email);
+		tymConfig.update('password', password);
+
+		createUserWithEmailAndPassword(auth, email, password)
+			.catch((error) => {
+				const errorCode = error.code;
+				const errorMessage = error.message;
+				vscode.window.showErrorMessage(`Oops, something went wrong. Please contact the extension creators to resolve the issue. ${errorCode}, ${errorMessage}`);
+			});
+	} else {
+		signInWithEmailAndPassword(auth, email, password)
+			.catch((error) => {
+				const errorCode = error.code;
+				const errorMessage = error.message;
+				vscode.window.showErrorMessage(`Oops, something went wrong. Please contact the extension creators to resolve the issue. ${errorCode}, ${errorMessage}`);
+			});
+	}
+
+	// Webview Provider
 	const provider = new TymViewProvider(context.extensionUri);
-
 	context.subscriptions.push(vscode.window.registerWebviewViewProvider(TymViewProvider.viewType, provider));
-}
-
-class TymViewProvider implements vscode.WebviewViewProvider {
-	public static readonly viewType = 'tym.collaborationView';
-	private _view?: vscode.WebviewView;
-
-	constructor(private readonly _extensionUri: vscode.Uri) {}
-
-	public resolveWebviewView(
-		webviewView: vscode.WebviewView,
-		_context: vscode.WebviewViewResolveContext,
-		_token: vscode.CancellationToken
-	) {
-		this._view = webviewView;
-
-		webviewView.webview.options = {
-			// Allow scripts in the webview
-			enableScripts: true,
-
-			localResourceRoots: [this._extensionUri]
-		};
-
-		webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
-
-		webviewView.webview.onDidReceiveMessage((data) => {
-			switch (data.type) {
-				case 'colorSelected': {
-					vscode.window.activeTextEditor?.insertSnippet(new vscode.SnippetString(`#${data.value}`));
-					break;
-				}
-			}
-		});
-	}
-
-	public addColor() {
-		if (this._view) {
-			this._view.show?.(true); // `show` is not implemented in 1.49 but is for 1.50 insiders
-			this._view.webview.postMessage({ type: 'addColor' });
-		}
-	}
-
-	public clearColors() {
-		if (this._view) {
-			this._view.webview.postMessage({ type: 'clearColors' });
-		}
-	}
-
-	private _getHtmlForWebview(webview: vscode.Webview) {
-		// Get the local path to main script run in the webview, then convert it to a uri we can use in the webview.
-		const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'main.js'));
-
-		// Do the same for the stylesheet.
-		const styleResetUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'reset.css'));
-		const styleVSCodeUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'vscode.css'));
-		const styleMainUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'main.css'));
-
-		// Use a nonce to only allow a specific script to be run.
-		const nonce = getNonce();
-
-		return `<!DOCTYPE html>
-			<html lang="en">
-			<head>
-				<meta charset="UTF-8">
-
-				<!--
-					Use a content security policy to only allow loading images from https or from our extension directory,
-					and only allow scripts that have a specific nonce.
-				-->
-				<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
-
-				<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-				<link href="${styleResetUri}" rel="stylesheet">
-				<link href="${styleVSCodeUri}" rel="stylesheet">
-				<link href="${styleMainUri}" rel="stylesheet">
-				
-				<title>Cat Colors</title>
-			</head>
-			<body>
-				<ul class="color-list">
-				</ul>
-				<button class="add-color-button">Add Color</button>
-
-				<script nonce="${nonce}" src="${scriptUri}"></script>
-			</body>
-			</html>`;
-	}
-}
-
-function getNonce() {
-	let text = '';
-	const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-	for (let i = 0; i < 32; i++) {
-		text += possible.charAt(Math.floor(Math.random() * possible.length));
-	}
-	return text;
 }
