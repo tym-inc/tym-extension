@@ -20,6 +20,10 @@
 			{
 				"command": "tymExtension.getGithubLink",
 				"title": "Get Github Link"
+			},
+			{
+				"command": "tymExtension.addCodeSnippet",
+				"title": "Add Snippet to Question"
 			}
 		],
 		"configuration": {
@@ -40,6 +44,11 @@
 				{
 					"when": "editorFocus",
 					"command": "tymExtension.getGithubLink",
+					"group": "6_copypath"
+				},
+				{
+					"when": "editorFocus",
+					"command": "tymExtension.addCodeSnippet",
 					"group": "6_copypath"
 				}
 			]

@@ -1,11 +1,10 @@
 import { CancellationToken, CodeActionContext, CodeActionProvider, Command, Range, TextDocument, window } from 'vscode';
 
 export class TymCodeActionProvider implements CodeActionProvider {
-	constructor() {}
 
 	provideCodeActions(
 		_document: TextDocument,
-		range: Range,
+		_range: Range,
 		_context: CodeActionContext,
 		_token: CancellationToken
 	): Command[] | Thenable<Command[]> {
@@ -16,6 +15,11 @@ export class TymCodeActionProvider implements CodeActionProvider {
 					{
 						title: 'Get Github Link',
 						command: 'tymExtension.getGithubLink',
+						arguments: [{ source: 'Lightbulb Menu' }]
+					},
+					{
+						title: 'Add Snippet to Question',
+						command: 'tymExtension.addCodeSnippet',
 						arguments: [{ source: 'Lightbulb Menu' }]
 					}
 				];

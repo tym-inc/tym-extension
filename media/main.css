@@ -10,7 +10,8 @@ button.submit-question-btn:hover {
 	background-color: rgb(21, 146, 21);
 }
 
-.new-question {
+.new-question, 
+.asked-question {
 	padding: 0.7rem;
 	border-style: solid;
 	border-width: 1px;
@@ -54,24 +55,36 @@ button.xout-btn:hover {
 	height: 10rem;
 }
 
+.code-snippets {
+	margin-top: 0.2rem;
+}
+
 .snippet-hint {
 	margin-top: 0.2rem;
 	font-size: smaller;
 	opacity: 0.3;
 }
 
-.snippet {
+.snippet-context {
+	margin-top: 0.2rem;
+}
+
+
+
+.snippet-code,
+.asked-description,
+.asked-terminal-output {
+	margin-top: 0.2rem;
+	padding: 0.2rem 0.3rem 0.4rem 0.4rem;
 	background-color: var(--vscode-input-background);
 	color: var(--vscode-input-foreground);
-}
-
-.snippet-line {
+	font-size: smaller;
 	text-overflow: ellipsis;
 	overflow: hidden;
-	white-space: nowrap;
+	white-space: pre-line;
 }
 
-.snippet-context .location {
+.clickable-link {
 	font-size: smaller;
 	text-overflow: ellipsis;
 	overflow: hidden;

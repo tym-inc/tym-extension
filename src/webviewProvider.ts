@@ -1,13 +1,65 @@
 import * as vscode from 'vscode';
+import { getDatabase, ref, set, onValue, update } from "firebase/database";
+import { getAuth } from "firebase/auth";
+import { getSelectionInfo, ISelectionInfo } from './link';
 import { getNonce } from './util';
+import { Repository } from './git';
+
+interface IQuestion {
+	id: string;
+	description: string;
+	terminalOutput: string;
+	codeSnippets: ISelectionInfo;
+	resolved: boolean;
+}
 
 export class TymViewProvider implements vscode.WebviewViewProvider {
 	public static readonly viewType = 'tym.collaborationView';
+	private readonly _pendingMessages: any[] = [];
 	private _view?: vscode.WebviewView;
+	private readonly _questions: IQuestion[] = [];
 
 	constructor(
 		private readonly _extensionUri: vscode.Uri,
-	) { }
+		private readonly _gitRepository: Repository
+	) {
+		// register command to add code snippet
+		vscode.commands.registerCommand('tymExtension.addCodeSnippet', () => {
+			// first jump to the webview
+			vscode.commands.executeCommand('workbench.view.extension.tym');
+			const selectionInfo = getSelectionInfo(_gitRepository);
+			if (selectionInfo) {
+				// send code snippet to the webview
+				this._addCodeSnippet(selectionInfo);
+			}
+		});
+
+		const auth = getAuth();
+		const db = getDatabase();
+		
+		auth.onAuthStateChanged(user => {
+			if (user) {
+				onValue(ref(db, user.uid), (snapshot: any) => {
+					const data = snapshot.val();
+					if (data) {
+						this._questions.length = 0;
+						Object.entries(data).filter(([_qid, question]: any) => {
+							return !question.resolved;
+						}).forEach(([qid, question]: any) => {
+							this._questions.push({id: qid, ...question});
+						});
+
+						const message = { type: 'setAskedQuestions', value: this._questions };
+						if (this._view) {
+							this._view.webview.postMessage(message);
+						} else {
+							this._pendingMessages.push(message);
+						}
+					}
+				});
+			}
+		});
+	}
 
 	public resolveWebviewView(
 		webviewView: vscode.WebviewView,
@@ -27,16 +79,73 @@ export class TymViewProvider implements vscode.WebviewViewProvider {
 		webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 
 		webviewView.webview.onDidReceiveMessage(data => {
-			console.log('on received message');
 			switch (data.type) {
 				case 'getAskedQuestions':
 					{
-						vscode.window.showInformationMessage('getAskedQuestions');
-						this._view?.webview.postMessage({ type: 'setAskedQuestions', value: ['a', 'b', 'c'] });
+						this._view?.webview.postMessage({ type: 'setAskedQuestions', value: this._questions });
+						break;
+					}
+				case 'goToLocation':
+					{
+						const { uri, startLine } = data.value;
+						const startPos = new vscode.Position(startLine - 1, 0);
+						vscode.commands.executeCommand('editor.action.goToLocations', vscode.Uri.parse(uri), startPos, [startPos], 'goto', 'Could not find snippet.');
+						break;
+					}
+				case 'submitQuestion':
+					{
+						// TODO let them know about sharing uncommitted changes - and then proceed once they are aware
+						const { description, terminalOutput, codeSnippets } = data.value;
+						const db = getDatabase();
+						const uid = getAuth().currentUser?.uid;
+						if (uid) {
+							// TODO create README.md add to git index
+							// push to secret ref
+	
+							// Get shareable link
+							
+							// TODO set ref
+							set(ref(db, `${uid}/${getNonce()}`), {
+								description,
+								terminalOutput,
+								codeSnippets,
+								resolved: false
+							});							
+						}
+						break;
+					}
+				case 'markAsResolved':
+					{
+						const qid = data.value;
+						const db = getDatabase();
+						const uid = getAuth().currentUser?.uid;
+						if (uid) {
+							update(ref(db, `${uid}/${qid}`), {
+								resolved: true
+							});							
+						} 
+						break;
+					}
+				case 'copyShareableLink':
+					{
+						console.log('Generate shareable link', data.value);
 						break;
 					}
 			}
 		});
+
+		this._pendingMessages.forEach(message => {
+			this._view?.webview.postMessage(message);
+		});
+	}
+
+	private _addCodeSnippet(codeSnippet: ISelectionInfo): void {
+		const message = { type: 'addCodeSnippet', value: codeSnippet };
+		if (this._view) {
+			this._view.webview.postMessage(message);
+		} else {
+			this._pendingMessages.push(message);
+		}
 	}
 
 	private _getHtmlForWebview(webview: vscode.Webview) {
@@ -83,21 +192,7 @@ export class TymViewProvider implements vscode.WebviewViewProvider {
 							<textarea class="description mt" type="text" placeholder="Brief description (optional)"></textarea>
 							<div class="mt">
 								<h4>Code Snippets</h4>
-								<div class="code-snippets flex flex-col">
-									<div>
-										<div class="snippet-context flex flex-row justify-between">
-											<a class="file-info">src/webviewProvider.ts#L3-L3</a>
-										</div>
-										<div class="snippet">
-											<div class="snippet-line">
-												schedule.every(1).seconds.do(job)
-											</div>
-											<div class="snippet-line">
-												schedule.every(5).seconds.do(less_frequent_job)
-											</div>
-										</div>
-									</div>
-								</div>
+								<div class="code-snippets flex flex-col"></div>
 								<div class="snippet-hint">
 									Hint: To add a code-snippet here, select the snippet with the editor, right click, and click on "Add snippet to question".
 								</div>

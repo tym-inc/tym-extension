@@ -1,5 +1,5 @@
 import { API, Remote, Repository } from './git';
-import * as vscode from 'vscode';
+import {Range, Position, window, env, Uri} from 'vscode';
 import { sendTelemetryData } from './util';
 
 interface IGithubRemoteInfo {
@@ -7,46 +7,58 @@ interface IGithubRemoteInfo {
 	repo: string;
 }
 
-interface ISelectionInfo {
+export interface ISelectionInfo {
 	startLine: number;
 	endLine: number;
 	relativePath: string;
+	uri: string
+	content: string;
 }
 
-export async function getGithubLink(git: API) {
-	sendTelemetryData('getGithubLink called');
+export function getGitRepository(git: API): Repository | undefined {
 	const repositories = git.repositories;
-	if (repositories.length <= 0) return;
-	const repository = repositories[0];
+	if (repositories.length <= 0) return undefined;
+	return repositories[0];
+}
 
+export async function getGithubLink(repository: Repository): Promise<void> {
+	sendTelemetryData('getGithubLink called');
 	const selectionInfo = getSelectionInfo(repository);
+	console.log(selectionInfo);
 
 	const githubRemoteInfo = getGithubRemoteInfo(repository);
 	const branch = repository.state.HEAD?.name;
 	if (!githubRemoteInfo || !selectionInfo || !branch) return;
 	const isCommitted = await isSelectionCommitted(repository, selectionInfo);
 	if (!isCommitted) {
-		vscode.window.showErrorMessage('Failed to generate Github link: selected text is not committed yet.');
+		window.showErrorMessage('Failed to generate Github link: selected text is not committed yet.');
 		return;
 	}
-	await adjustSelectionLines(repository, selectionInfo);
+	const adjustedSelectionInfo = await adjustSelectionLines(repository, selectionInfo);
 	const { owner, repo } = githubRemoteInfo;
-	const { relativePath, startLine, endLine } = selectionInfo;
+	const { relativePath, startLine, endLine } = adjustedSelectionInfo;
 	const githubLink = `https://github.dev/${owner}/${repo}/blob/${branch}/${relativePath}#L${startLine}-L${endLine}`;
-	vscode.env.clipboard.writeText(githubLink);
-	vscode.window.showInformationMessage('Github Link copied!');
+	env.clipboard.writeText(githubLink);
+	window.showInformationMessage('Github Link copied!');
 }
 
-function getSelectionInfo(repository: Repository): ISelectionInfo | undefined {
-	const editor = vscode.window.activeTextEditor;
+export function getSelectionInfo(repository: Repository): ISelectionInfo | undefined {
+	const editor = window.activeTextEditor;
 	if (!editor?.selection) return undefined;
 	const { start, end } = editor.selection;
+	const content = editor.document.getText(
+		new Range(
+			new Position(start.line, 0), 
+			new Position(end.character === 0 ? end.line : end.line + 1, 0))); // if the only the 0'th character is highlighted, don't include the line
 	const relativePath = getRelativePath(repository.rootUri, editor.document.uri);
 	if (!relativePath) return;
+	
 	return {
 		relativePath,
 		startLine: start.line + 1,
-		endLine: end.line + 1
+		endLine: end.line + 1,
+		content,
+		uri: editor.document.uri.toString()
 	};
 }
 
@@ -78,10 +90,10 @@ class LineTracker {
 	}
 }
 
-async function adjustSelectionLines(repository: Repository, selectionInfo: ISelectionInfo) {
-	let { startLine, endLine } = selectionInfo;
+async function adjustSelectionLines(repository: Repository, selectionInfo: ISelectionInfo): Promise<ISelectionInfo> {
+	const { startLine, endLine } = selectionInfo;
 	const changes = await repository.diffWithHEAD(selectionInfo.relativePath);
-	if (!changes) return false;
+	if (!changes) return selectionInfo;
 	const DIFF_CHANGE_REGEX =
 		/@@ -(?<oldStartLine>[0-9]*),(?<oldNumLines>[0-9]*) \+(?<newStartLine>[0-9]*),(?<newNumLines>[0-9]*) @@/;
 	const start = new LineTracker(startLine);
@@ -130,10 +142,7 @@ async function adjustSelectionLines(repository: Repository, selectionInfo: ISele
 			break;
 		}
 	}
-	console.log('startLine', start.lineNumber);
-	console.log('endLine', end.lineNumber);
-	selectionInfo.startLine = start.lineNumber;
-	selectionInfo.endLine = end.lineNumber;
+	return {...selectionInfo, startLine: start.lineNumber, endLine: end.lineNumber};
 }
 
 async function isSelectionCommitted(repository: Repository, selectionInfo: ISelectionInfo): Promise<boolean> {
@@ -154,7 +163,7 @@ function isNumberInRange(number: number, start: number, end: number): boolean {
 	return start <= number && end >= number;
 }
 
-function getRelativePath(ancestor: vscode.Uri, descendant: vscode.Uri) {
+function getRelativePath(ancestor: Uri, descendant: Uri) {
 	const ancestorParts = ancestor.path.split('/');
 	const descendantParts = descendant.path.split('/');
 	if (ancestorParts.length >= descendantParts.length) return undefined;
@@ -176,7 +185,7 @@ function getGithubRemoteInfo(repository: Repository): IGithubRemoteInfo | undefi
 }
 
 function parseGithubRemoteInfoFromUrl(githubUrl: string): IGithubRemoteInfo | undefined {
-	const GITHUB_REMOTE_REGEX = /github\.com.(?<owner>[^!@#$%^&*\/\\]*)\/(?<repo>[^!@#$%^&*\/\\]*)\.git/;
+	const GITHUB_REMOTE_REGEX = /github\.com.(?<owner>[^!@#$%^&*/\\]*)\/(?<repo>[^!@#$%^&*/\\]*)\.git/;
 	if (githubUrl) {
 		const matches = githubUrl?.match(GITHUB_REMOTE_REGEX);
 		if (matches?.groups) {
