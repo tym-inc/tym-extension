@@ -39,6 +39,7 @@ export async function getGithubLink(repository: Repository): Promise<void> {
 	const githubLink = `https://github.dev/${owner}/${repo}/blob/${branch}/${relativePath}#L${startLine}-L${endLine}`;
 	env.clipboard.writeText(githubLink);
 	window.showInformationMessage('Github link copied!');
+	env.openExternal(Uri.parse(githubLink));
 }
 
 export function getSelectionInfo(repository: Repository): ISelectionInfo | undefined {
