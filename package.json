@@ -1,9 +1,9 @@
 {
 	"name": "tym",
 	"displayName": "Tym",
-	"description": "Seamless code collaboration",
+	"description": "Share your code context in one-click",
 	"version": "1.0.0",
-	"publisher": "tym",
+	"publisher": "tym-inc",
 	"repository": "https://github.com/tym-inc/tym-extension",
 	"engines": {
 		"vscode": "^1.60.0"
@@ -88,13 +88,13 @@
 	},
 	"devDependencies": {
 		"@types/node": "^12.12.0",
-		"@types/vscode": "^1.65.0",
+		"@types/vscode": "^1.60.0",
 		"@typescript-eslint/eslint-plugin": "^4.16.0",
 		"@typescript-eslint/parser": "^4.16.0",
 		"eslint": "^7.21.0",
 		"typescript": "^4.5.5"
 	},
-	"icon": "https://firebasestorage.googleapis.com/v0/b/tokyo-unity-328718.appspot.com/o/tym-128.png?alt=media&token=c348cb5b-7d1f-46b6-8291-5b25351a8ed7",
+	"icon": "media/tym-128.png",
 	"dependencies": {
 		"axios": "^0.26.1",
 		"firebase": "^9.6.10"
