@@ -36,6 +36,11 @@
 				"tym.password": {
 					"type": "string",
 					"description": "Password - a randomly generated password for the email"
+				},
+				"tym.showDraftBranchModal": {
+					"type": "boolean",
+					"default": "true",
+					"description": "Verify with the user to ensure they know the a draft ref will be created on Github"
 				}
 			}
 		},

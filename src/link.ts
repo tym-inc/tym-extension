@@ -24,7 +24,6 @@ export function getGitRepository(git: API): Repository | undefined {
 export async function getGithubLink(repository: Repository): Promise<void> {
 	sendTelemetryData('getGithubLink called');
 	const selectionInfo = getSelectionInfo(repository);
-	console.log(selectionInfo);
 
 	const githubRemoteInfo = getGithubRemoteInfo(repository);
 	const branch = repository.state.HEAD?.name;
@@ -39,7 +38,7 @@ export async function getGithubLink(repository: Repository): Promise<void> {
 	const { relativePath, startLine, endLine } = adjustedSelectionInfo;
 	const githubLink = `https://github.dev/${owner}/${repo}/blob/${branch}/${relativePath}#L${startLine}-L${endLine}`;
 	env.clipboard.writeText(githubLink);
-	window.showInformationMessage('Github Link copied!');
+	window.showInformationMessage('Github link copied!');
 }
 
 export function getSelectionInfo(repository: Repository): ISelectionInfo | undefined {
@@ -175,7 +174,7 @@ function getRelativePath(ancestor: Uri, descendant: Uri) {
 	return descendantParts.slice(ancestorParts.length).join('/');
 }
 
-function getGithubRemoteInfo(repository: Repository): IGithubRemoteInfo | undefined {
+export function getGithubRemoteInfo(repository: Repository): IGithubRemoteInfo | undefined {
 	const remotes = repository.state.remotes;
 	const originRemote = findOriginRemote(remotes);
 	if (originRemote?.fetchUrl) {

@@ -196,7 +196,7 @@
         }
 
         shareLink.onclick = () => {
-            vscode.postMessage({ type: 'copyShareableLink', value: question.id});
+            vscode.postMessage({ type: 'copyShareableLink', value: question.link});
         };
 
         markAsResolved.onclick = () => {
