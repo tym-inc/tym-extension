@@ -104,7 +104,7 @@ export class TymViewProvider implements vscode.WebviewViewProvider {
 						const tymConfig = vscode.workspace.getConfiguration('tym');
 						const showDraftBranchModal = tymConfig.get<string>('showDraftBranchModal') ?? true;
 						if (showDraftBranchModal) {
-							const choice = await vscode.window.showInformationMessage(`Tym will be creating a link to your uncommitted changes by pushing to Github. Your draft work can only be accessed and viewed from the shareable link.`, {modal: true}, "Continue");
+							const choice = await vscode.window.showInformationMessage(`Tym will be creating a link to your uncommitted changes by pushing to Github. Make sure there are no secret keys in your code. Your draft work can only be accessed and viewed from the shareable link.`, {modal: true}, "Continue");
 							if (choice !== 'Continue') return;
 							tymConfig.update('showDraftBranchModal', false, true);
 						}
