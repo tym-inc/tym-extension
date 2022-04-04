@@ -147,6 +147,8 @@ export class TymViewProvider implements vscode.WebviewViewProvider {
 							const githubLink = `https://github.dev/${owner}/${repo}/blob/${commitHash}/QUESTION.md`;
 							vscode.env.clipboard.writeText(githubLink);
 							vscode.window.showInformationMessage('Shareable link copied!');
+							vscode.env.openExternal(vscode.Uri.parse(githubLink));
+							
 
 							set(ref(db, `${uid}/${qid}`), {
 								description,
@@ -154,7 +156,8 @@ export class TymViewProvider implements vscode.WebviewViewProvider {
 								codeSnippets,
 								link: githubLink,
 								resolved: false
-							});							
+							});
+							this._view?.webview.postMessage({ type: 'closeNewQuestion' });
 						}
 						break;
 					}
@@ -176,6 +179,7 @@ export class TymViewProvider implements vscode.WebviewViewProvider {
 						sendTelemetryData('copyShareableLink');
 						vscode.env.clipboard.writeText(data.value);
 						vscode.window.showInformationMessage('Shareable link copied!');
+						vscode.env.openExternal(vscode.Uri.parse(data.value));
 						break;
 					}
 			}

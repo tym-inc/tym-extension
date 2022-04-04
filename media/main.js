@@ -18,6 +18,9 @@
             case 'setAskedQuestions':
                 setAskedQuestions(message.value);
                 break;
+            case 'closeNewQuestion':
+                closeNewQuestion();
+                break;
         }
     });
 
@@ -69,7 +72,6 @@
 
     submitQuestionBtn.onclick = () => {
         vscode.postMessage({ type: "submitQuestion", value: questionInputs });
-        closeNewQuestion();
     };
 
     descriptionInput.value = questionInputs.description;
