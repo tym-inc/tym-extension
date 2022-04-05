@@ -2,6 +2,7 @@ import { getAuth } from 'firebase/auth';
 import { ISelectionInfo } from './link';
 import { posthogAnalyticsUrl, posthogApiKey } from './secrets';
 import * as https from 'https';
+import { execSync } from 'child_process';
 
 export function getNonce(): string {
 	let text = '';
@@ -36,11 +37,16 @@ export function sendTelemetryData(eventName: string, data?: Record<string, unkno
 }
 
 export function identifyUser(): void {
-	sendTelemetryData('$identify', {}, 'screen');
+	sendTelemetryData('$identify', { $set: { name: getUserName() ?? getUserEmail(), email: getUserEmail() } }, 'screen');
 }
 
-function getUserEmail() {
-	return getAuth().currentUser?.email;
+function getUserName(): string | undefined {
+	const gitName = execSync(`git config user.name`).toString().trim();
+	return gitName.length > 0 ? gitName : undefined;
+}
+
+function getUserEmail(): string | undefined {
+	return getAuth().currentUser?.email ?? undefined;
 }
 
 export function generateMarkdownString(
