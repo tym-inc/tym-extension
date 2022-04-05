@@ -48,12 +48,12 @@
 		"menus": {
 			"editor/context": [
 				{
-					"when": "editorFocus",
+					"when": "tym.active && editorFocus",
 					"command": "tymExtension.getGithubLink",
 					"group": "6_copypath"
 				},
 				{
-					"when": "editorFocus",
+					"when": "tym.active && editorFocus",
 					"command": "tymExtension.addCodeSnippet",
 					"group": "6_copypath"
 				}
