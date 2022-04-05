@@ -30,7 +30,7 @@ export async function getGithubLink(repository: Repository): Promise<void> {
 	if (!githubRemoteInfo || !selectionInfo || !branch) return;
 	const isCommitted = await isSelectionCommitted(repository, selectionInfo);
 	if (!isCommitted) {
-		window.showErrorMessage('Failed to generate Github link: selected text is not committed yet.');
+		window.showErrorMessage('Failed to generate Github link: selected text is not committed yet. You can use add snippet to question instead');
 		return;
 	}
 	const adjustedSelectionInfo = await adjustSelectionLines(repository, selectionInfo);
