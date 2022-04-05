@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
-import { getDatabase, ref, set, onValue, update } from "firebase/database";
-import { getAuth } from "firebase/auth";
+import { getDatabase, ref, set, onValue, update } from 'firebase/database';
+import { getAuth } from 'firebase/auth';
 import { getGithubRemoteInfo, getSelectionInfo, ISelectionInfo } from './link';
 import { generateMarkdownString, getNonce, identifyUser, sendTelemetryData } from './util';
 import { Repository } from './git';
@@ -21,10 +21,7 @@ export class TymViewProvider implements vscode.WebviewViewProvider {
 	private _view?: vscode.WebviewView;
 	private readonly _questions: IQuestion[] = [];
 
-	constructor(
-		private readonly _extensionUri: vscode.Uri,
-		private readonly _gitRepository: Repository
-	) {
+	constructor(private readonly _extensionUri: vscode.Uri, private readonly _gitRepository?: Repository) {
 		// register command to add code snippet
 		vscode.commands.registerCommand('tymExtension.addCodeSnippet', () => {
 			sendTelemetryData('addCodeSnippet');
@@ -39,19 +36,28 @@ export class TymViewProvider implements vscode.WebviewViewProvider {
 
 		const auth = getAuth();
 		const db = getDatabase();
-		
-		auth.onAuthStateChanged(user => {
+
+		auth.onAuthStateChanged((user) => {
+			sendTelemetryData('authStateChanged', { uid: user?.uid });
 			if (user) {
+				const remoteInfo = getGithubRemoteInfo(this._gitRepository!);
+				if (!remoteInfo) {
+					sendTelemetryData('onAuthStateChangeFailed', { reason: 'remoteInfo is undefined' });
+					return;
+				}
+				const { owner, repo } = remoteInfo;
 				identifyUser();
-				onValue(ref(db, user.uid), (snapshot: any) => {
+				onValue(ref(db, `${user.uid}/${owner}-${repo}`), (snapshot: any) => {
 					const data = snapshot.val();
 					if (data) {
 						this._questions.length = 0;
-						Object.entries(data).filter(([_qid, question]: any) => {
-							return !question.resolved;
-						}).forEach(([qid, question]: any) => {
-							this._questions.push({id: qid, ...question});
-						});
+						Object.entries(data)
+							.filter(([_qid, question]: any) => {
+								return !question.resolved;
+							})
+							.forEach(([qid, question]: any) => {
+								this._questions.push({ id: qid, ...question });
+							});
 
 						const message = { type: 'setAskedQuestions', value: this._questions };
 						if (this._view) {
@@ -68,124 +74,133 @@ export class TymViewProvider implements vscode.WebviewViewProvider {
 	public resolveWebviewView(
 		webviewView: vscode.WebviewView,
 		_context: vscode.WebviewViewResolveContext,
-		_token: vscode.CancellationToken,
+		_token: vscode.CancellationToken
 	): void {
 		this._view = webviewView;
 
 		webviewView.webview.options = {
 			// Allow scripts in the webview
 			enableScripts: true,
-			localResourceRoots: [
-				this._extensionUri
-			]
+			localResourceRoots: [this._extensionUri]
 		};
 
 		webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 
 		webviewView.webview.onDidReceiveMessage(async (data) => {
 			switch (data.type) {
-				case 'getAskedQuestions':
-					{
-						sendTelemetryData('getAskedQuestions', {numQuestions: this._questions.length});
-						this._view?.webview.postMessage({ type: 'setAskedQuestions', value: this._questions });
-						break;
+				case 'getAskedQuestions': {
+					sendTelemetryData('getAskedQuestions', { numQuestions: this._questions.length });
+					this._view?.webview.postMessage({ type: 'setAskedQuestions', value: this._questions });
+					break;
+				}
+				case 'goToLocation': {
+					sendTelemetryData('goToLocation');
+					const { uri, startLine } = data.value;
+					const startPos = new vscode.Position(startLine - 1, 0);
+					vscode.commands.executeCommand(
+						'editor.action.goToLocations',
+						vscode.Uri.parse(uri),
+						startPos,
+						[startPos],
+						'goto',
+						'Could not find snippet.'
+					);
+					break;
+				}
+				case 'submitQuestion': {
+					// Notification to let them know about sharing uncommitted changes - and then proceed once they are aware
+					const tymConfig = vscode.workspace.getConfiguration('tym');
+					const showDraftBranchModal = tymConfig.get<string>('showDraftBranchModal') ?? true;
+					if (showDraftBranchModal) {
+						const choice = await vscode.window.showInformationMessage(
+							`Tym will be creating a link to your uncommitted changes by pushing to Github. Make sure there are no secret keys in your code. Your draft work can only be accessed and viewed from the shareable link.`,
+							{ modal: true },
+							'Continue'
+						);
+						if (choice !== 'Continue') return;
+						tymConfig.update('showDraftBranchModal', false, true);
 					}
-				case 'goToLocation':
-					{
-						sendTelemetryData('goToLocation');
-						const { uri, startLine } = data.value;
-						const startPos = new vscode.Position(startLine - 1, 0);
-						vscode.commands.executeCommand('editor.action.goToLocations', vscode.Uri.parse(uri), startPos, [startPos], 'goto', 'Could not find snippet.');
-						break;
-					}
-				case 'submitQuestion':
-					{
-						// Notification to let them know about sharing uncommitted changes - and then proceed once they are aware
-						const tymConfig = vscode.workspace.getConfiguration('tym');
-						const showDraftBranchModal = tymConfig.get<string>('showDraftBranchModal') ?? true;
-						if (showDraftBranchModal) {
-							const choice = await vscode.window.showInformationMessage(`Tym will be creating a link to your uncommitted changes by pushing to Github. Make sure there are no secret keys in your code. Your draft work can only be accessed and viewed from the shareable link.`, {modal: true}, "Continue");
-							if (choice !== 'Continue') return;
-							tymConfig.update('showDraftBranchModal', false, true);
+					const { description, terminalOutput, codeSnippets } = data.value;
+					const db = getDatabase();
+					const uid = getAuth().currentUser?.uid;
+					const qid = getNonce();
+					sendTelemetryData('submitQuestion', { qid });
+					if (uid) {
+						// Add git index
+						const gitRepoRoot = this._gitRepository!.rootUri.path;
+						const parentCommitId = this._gitRepository!.state?.HEAD?.commit;
+						const gitIndexLocation = `${gitRepoRoot}/.git/index`;
+						if (!parentCommitId) {
+							sendTelemetryData('submitQuestionFailed', { reason: 'parentCommitId is undefined' });
+							return;
 						}
-						const { description, terminalOutput, codeSnippets } = data.value;
-						const db = getDatabase();
-						const uid = getAuth().currentUser?.uid;
-						const qid = getNonce();
-						sendTelemetryData('submitQuestion', { qid });
-						if (uid) {
-							// Add git index
-							const gitRepoRoot = this._gitRepository.rootUri.path;
-							const parentCommitId = this._gitRepository.state?.HEAD?.commit;
-							const gitIndexLocation = `${gitRepoRoot}/.git/index`;
-							if (!parentCommitId) {
-								sendTelemetryData('submitQuestionFailed', {reason: 'parentCommitId is undefined'});
-								return;
-							}
-							const remoteInfo = getGithubRemoteInfo(this._gitRepository);
-							if (!remoteInfo) {
-								sendTelemetryData('submitQuestionFailed', {reason: 'remoteInfo is undefined'});
-								return;
-							}
-							const {owner, repo} = remoteInfo;
-							// Store git index into memory
-							const readme = generateMarkdownString(description, terminalOutput, codeSnippets);
-							const gitIndex = fs.readFileSync(gitIndexLocation);
-							// push to secret ref
-							cp.execSync(`git add -A`, { cwd: gitRepoRoot });
-							const readmeHash = cp.execSync(`git hash-object -w --stdin`, { input: readme, cwd: gitRepoRoot }).toString().trim();
-							cp.execSync(`git update-index --add --cacheinfo 100644 ${readmeHash} QUESTION.md`, { cwd: gitRepoRoot });
-							const treeHash = cp.execSync(`git write-tree`, { cwd: gitRepoRoot }).toString().trim();
-							const commitHash = cp.execSync(`git commit-tree ${treeHash} -p ${parentCommitId} -m "${qid}"`, { cwd: gitRepoRoot }).toString().trim();
-							cp.execSync(`git update-ref refs/tym/${qid} ${commitHash}`, { cwd: gitRepoRoot });
-							cp.execSync(`git push origin refs/tym/${qid}:refs/tym/${qid}`, { cwd: gitRepoRoot });
-							cp.execSync(`git update-ref -d refs/tym/${qid}`, { cwd: gitRepoRoot });
-							// write index back
-							fs.writeFileSync(gitIndexLocation, gitIndex);
-
-							// Get shareable link
-							const githubLink = `https://github.dev/${owner}/${repo}/blob/${commitHash}/QUESTION.md`;
-							vscode.env.clipboard.writeText(githubLink);
-							vscode.window.showInformationMessage('Shareable link copied!');
-							vscode.env.openExternal(vscode.Uri.parse(githubLink));
-							
-
-							set(ref(db, `${uid}/${qid}`), {
-								description,
-								terminalOutput,
-								codeSnippets,
-								link: githubLink,
-								resolved: false
-							});
-							this._view?.webview.postMessage({ type: 'closeNewQuestion' });
+						const remoteInfo = getGithubRemoteInfo(this._gitRepository!);
+						if (!remoteInfo) {
+							sendTelemetryData('submitQuestionFailed', { reason: 'remoteInfo is undefined' });
+							return;
 						}
-						break;
-					}
-				case 'markAsResolved':
-					{
-						sendTelemetryData('markAsResolved');
-						const qid = data.value;
-						const db = getDatabase();
-						const uid = getAuth().currentUser?.uid;
-						if (uid) {
-							update(ref(db, `${uid}/${qid}`), {
-								resolved: true
-							});							
-						} 
-						break;
-					}
-				case 'copyShareableLink':
-					{
-						sendTelemetryData('copyShareableLink');
-						vscode.env.clipboard.writeText(data.value);
+						const { owner, repo } = remoteInfo;
+						// Store git index into memory
+						const readme = generateMarkdownString(description, terminalOutput, codeSnippets);
+						const gitIndex = fs.readFileSync(gitIndexLocation);
+						// push to secret ref
+						cp.execSync(`git add -A`, { cwd: gitRepoRoot });
+						const readmeHash = cp
+							.execSync(`git hash-object -w --stdin`, { input: readme, cwd: gitRepoRoot })
+							.toString()
+							.trim();
+						cp.execSync(`git update-index --add --cacheinfo 100644 ${readmeHash} QUESTION.md`, { cwd: gitRepoRoot });
+						const treeHash = cp.execSync(`git write-tree`, { cwd: gitRepoRoot }).toString().trim();
+						const commitHash = cp
+							.execSync(`git commit-tree ${treeHash} -p ${parentCommitId} -m "${qid}"`, { cwd: gitRepoRoot })
+							.toString()
+							.trim();
+						cp.execSync(`git update-ref refs/tym/${qid} ${commitHash}`, { cwd: gitRepoRoot });
+						cp.execSync(`git push origin refs/tym/${qid}:refs/tym/${qid}`, { cwd: gitRepoRoot });
+						cp.execSync(`git update-ref -d refs/tym/${qid}`, { cwd: gitRepoRoot });
+						// write index back
+						fs.writeFileSync(gitIndexLocation, gitIndex);
+
+						// Get shareable link
+						const githubLink = `https://github.dev/${owner}/${repo}/blob/${commitHash}/QUESTION.md`;
+						vscode.env.clipboard.writeText(githubLink);
 						vscode.window.showInformationMessage('Shareable link copied!');
-						vscode.env.openExternal(vscode.Uri.parse(data.value));
-						break;
+						vscode.env.openExternal(vscode.Uri.parse(githubLink));
+
+						set(ref(db, `${uid}/${owner}-${repo}/${qid}`), {
+							description,
+							terminalOutput,
+							codeSnippets,
+							link: githubLink,
+							resolved: false
+						});
+						this._view?.webview.postMessage({ type: 'closeNewQuestion' });
 					}
+					break;
+				}
+				case 'markAsResolved': {
+					sendTelemetryData('markAsResolved');
+					const qid = data.value;
+					const db = getDatabase();
+					const uid = getAuth().currentUser?.uid;
+					if (uid) {
+						update(ref(db, `${uid}/${qid}`), {
+							resolved: true
+						});
+					}
+					break;
+				}
+				case 'copyShareableLink': {
+					sendTelemetryData('copyShareableLink');
+					vscode.env.clipboard.writeText(data.value);
+					vscode.window.showInformationMessage('Shareable link copied!');
+					vscode.env.openExternal(vscode.Uri.parse(data.value));
+					break;
+				}
 			}
 		});
 
-		this._pendingMessages.forEach(message => {
+		this._pendingMessages.forEach((message) => {
 			this._view?.webview.postMessage(message);
 		});
 	}
@@ -200,6 +215,20 @@ export class TymViewProvider implements vscode.WebviewViewProvider {
 	}
 
 	private _getHtmlForWebview(webview: vscode.Webview) {
+		if (!this._gitRepository) {
+			return `<!DOCTYPE html>
+			<html lang="en">
+			<head>
+				<meta charset="UTF-8">
+			</head>
+			<body>
+				The folder currently open doesn't have a git repository or does not have a GitHub remote. 
+				<br/>
+				<br/>
+				Open a git repository with a GitHub remote in order to use Tym.
+			</body>
+			</html>`;
+		}
 		// Get the local path to main script run in the webview, then convert it to a uri we can use in the webview.
 		const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'main.js'));
 

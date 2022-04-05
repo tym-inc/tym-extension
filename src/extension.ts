@@ -12,10 +12,12 @@ import { firebaseConfig } from './secrets';
 export function activate(context: vscode.ExtensionContext): void {
 	const gitExtension = vscode.extensions.getExtension<GitExtension>('vscode.git')?.exports;
 	const git = gitExtension?.getAPI(1);
-
+	vscode.commands.executeCommand('setContext', 'tym.active', false);
 	if (git) {
 		const gitRepository = getGitRepository(git);
-		if (!gitRepository) return;
+		if (gitRepository) {
+			vscode.commands.executeCommand('setContext', 'tym.active', true);
+		}
 
 		// Using firebase to store question data + get notifications when user visits the question
 		const app = initializeApp(firebaseConfig);
@@ -63,7 +65,7 @@ export function activate(context: vscode.ExtensionContext): void {
 			});
 		}
 
-		const tymCodeActionProvider = new TymCodeActionProvider();
+		const tymCodeActionProvider = new TymCodeActionProvider(!!gitRepository);
 		context.subscriptions.push(
 			vscode.commands.registerCommand('tymExtension.getGithubLink', () => getGithubLink(gitRepository)),
 			vscode.languages.registerCodeActionsProvider('*', tymCodeActionProvider)

@@ -1,5 +1,5 @@
 import { API, Remote, Repository } from './git';
-import {Range, Position, window, env, Uri} from 'vscode';
+import * as vscode from 'vscode';
 import { sendTelemetryData } from './util';
 
 interface IGithubRemoteInfo {
@@ -11,7 +11,7 @@ export interface ISelectionInfo {
 	startLine: number;
 	endLine: number;
 	relativePath: string;
-	uri: string
+	uri: string;
 	content: string;
 }
 
@@ -21,38 +21,48 @@ export function getGitRepository(git: API): Repository | undefined {
 	return repositories[0];
 }
 
-export async function getGithubLink(repository: Repository): Promise<void> {
+export async function getGithubLink(repository?: Repository): Promise<void> {
 	sendTelemetryData('getGithubLink called');
 	const selectionInfo = getSelectionInfo(repository);
-
-	const githubRemoteInfo = getGithubRemoteInfo(repository);
-	const branch = repository.state.HEAD?.name;
+	if (!selectionInfo) return;
+	const githubRemoteInfo = getGithubRemoteInfo(repository!);
+	const branch = repository!.state.HEAD?.name;
 	if (!githubRemoteInfo || !selectionInfo || !branch) return;
-	const isCommitted = await isSelectionCommitted(repository, selectionInfo);
+	const isCommitted = await isSelectionCommitted(repository!, selectionInfo);
 	if (!isCommitted) {
-		window.showErrorMessage('Failed to generate Github link: selected text is not committed yet. You can use add snippet to question instead');
+		vscode.window.showErrorMessage(
+			'Failed to generate Github link: selected text is not committed yet. You can use add snippet to question instead'
+		);
 		return;
 	}
-	const adjustedSelectionInfo = await adjustSelectionLines(repository, selectionInfo);
+	const adjustedSelectionInfo = await adjustSelectionLines(repository!, selectionInfo);
 	const { owner, repo } = githubRemoteInfo;
 	const { relativePath, startLine, endLine } = adjustedSelectionInfo;
 	const githubLink = `https://github.dev/${owner}/${repo}/blob/${branch}/${relativePath}#L${startLine}-L${endLine}`;
-	env.clipboard.writeText(githubLink);
-	window.showInformationMessage('Github link copied!');
-	env.openExternal(Uri.parse(githubLink));
+	vscode.env.clipboard.writeText(githubLink);
+	vscode.window.showInformationMessage('Github link copied!');
+	vscode.env.openExternal(vscode.Uri.parse(githubLink));
 }
 
-export function getSelectionInfo(repository: Repository): ISelectionInfo | undefined {
-	const editor = window.activeTextEditor;
+export function getSelectionInfo(repository?: Repository): ISelectionInfo | undefined {
+	if (!repository) {
+		vscode.window.showErrorMessage(
+			'Tym Extension Error: the current repo is not a git repo or does not have a GitHub remote.'
+		);
+		return;
+	}
+	const editor = vscode.window.activeTextEditor;
 	if (!editor?.selection) return undefined;
 	const { start, end } = editor.selection;
 	const content = editor.document.getText(
-		new Range(
-			new Position(start.line, 0), 
-			new Position(end.character === 0 ? end.line : end.line + 1, 0))); // if the only the 0'th character is highlighted, don't include the line
+		new vscode.Range(
+			new vscode.Position(start.line, 0),
+			new vscode.Position(end.character === 0 ? end.line : end.line + 1, 0)
+		)
+	); // if the only the 0'th character is highlighted, don't include the line
 	const relativePath = getRelativePath(repository.rootUri, editor.document.uri);
 	if (!relativePath) return;
-	
+
 	return {
 		relativePath,
 		startLine: start.line + 1,
@@ -142,7 +152,7 @@ async function adjustSelectionLines(repository: Repository, selectionInfo: ISele
 			break;
 		}
 	}
-	return {...selectionInfo, startLine: start.lineNumber, endLine: end.lineNumber};
+	return { ...selectionInfo, startLine: start.lineNumber, endLine: end.lineNumber };
 }
 
 async function isSelectionCommitted(repository: Repository, selectionInfo: ISelectionInfo): Promise<boolean> {
@@ -163,7 +173,7 @@ function isNumberInRange(number: number, start: number, end: number): boolean {
 	return start <= number && end >= number;
 }
 
-function getRelativePath(ancestor: Uri, descendant: Uri) {
+function getRelativePath(ancestor: vscode.Uri, descendant: vscode.Uri) {
 	const ancestorParts = ancestor.path.split('/');
 	const descendantParts = descendant.path.split('/');
 	if (ancestorParts.length >= descendantParts.length) return undefined;
