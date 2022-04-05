@@ -8,7 +8,7 @@ interface IGithubRemoteInfo {
 }
 
 export interface ISelectionInfo {
-	startLine: number;
+	test: string;
 	endLine: number;
 	relativePath: string;
 	uri: string;
