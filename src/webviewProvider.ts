@@ -179,12 +179,18 @@ export class TymViewProvider implements vscode.WebviewViewProvider {
 					break;
 				}
 				case 'markAsResolved': {
+					const remoteInfo = getGithubRemoteInfo(this._gitRepository!);
+					if (!remoteInfo) {
+						sendTelemetryData('markAsResolvedFailed', { reason: 'remoteInfo is undefined' });
+						return;
+					}
+					const { owner, repo } = remoteInfo;
 					sendTelemetryData('markAsResolved');
 					const qid = data.value;
 					const db = getDatabase();
 					const uid = getAuth().currentUser?.uid;
 					if (uid) {
-						update(ref(db, `${uid}/${qid}`), {
+						update(ref(db, `${uid}/${owner}-${repo}/${qid}`), {
 							resolved: true
 						});
 					}
