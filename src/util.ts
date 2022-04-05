@@ -274,6 +274,7 @@ const languageMap: { [key: string]: string } = {
 	aux: 'tex',
 	toc: 'tex',
 	txt: 'text',
+	ts: 'typescript',
 	v: 'v',
 	sv: 'v',
 	vala: 'vala',
