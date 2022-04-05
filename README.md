@@ -29,4 +29,4 @@ They see your question and code snippets in a web-vscode and can easily browse y
 
 ## 🔒 **Security**
 
-Our servers have no access to your code but we store the question, highlighted code snippets, and terminal dump. Our extension just commits your current code to your repo with a hidden git ref. So only people who have access to your Github repository can open the link. Learn more [here](https://www.notion.so/Committing-without-REALLY-committing-0f94a5252a104937b1dade1af6fc36b4).
+Our servers have no access to your code but we store the question, highlighted code snippets, and terminal dump. Our extension just commits your current code to your repo with a hidden git ref. So only people who have access to your Github repository can open the link. Learn more [here](https://tym-inc.notion.site/Committing-without-REALLY-committing-0f94a5252a104937b1dade1af6fc36b4).
