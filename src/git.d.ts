@@ -268,7 +268,11 @@ export interface API {
 	readonly onDidPublish: Event<PublishEvent>;
 	readonly git: Git;
 	readonly repositories: Repository[];
-	readonly onDidOpenRepository: Event<Repository>;
+	readonly on
+	
+	
+	
+	DidOpenRepository: Event<Repository>;
 	readonly onDidCloseRepository: Event<Repository>;
 
 	toGitUri(uri: Uri, ref: string): Uri;
