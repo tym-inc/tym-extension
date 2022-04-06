@@ -24,14 +24,22 @@ export function getGitRepository(git: API): Repository | undefined {
 export async function getGithubLink(repository?: Repository): Promise<void> {
 	sendTelemetryData('getGithubLink called');
 	const selectionInfo = getSelectionInfo(repository);
-	if (!selectionInfo) return;
+	if (!selectionInfo) {
+		sendTelemetryData('getGithubLink failed: no selectionInfo');
+		return;
+	}
 	const githubRemoteInfo = getGithubRemoteInfo(repository!);
+	if (!githubRemoteInfo) {
+		sendTelemetryData('getGithubLink failed: remoteInfo undefined.', { githubRemoteInfo });
+		vscode.window.showErrorMessage('Failed to generate Github link: unable to detect Github remote.');
+		return;
+	}
 	const branch = repository!.state.HEAD?.name;
-	if (!githubRemoteInfo || !selectionInfo || !branch) return;
+	const upstream = repository!.state.HEAD?.upstream;
 	const isCommitted = await isSelectionCommitted(repository!, selectionInfo);
-	if (!isCommitted) {
+	if (!isCommitted || !branch || !upstream) {
 		vscode.window.showErrorMessage(
-			'Failed to generate Github link: selected text is not committed yet. You can use add snippet to question instead'
+			'Failed to generate Github link: selected text is not committed yet or the current branch has no corresponding upstream branch on Github. You can use add snippet to question instead'
 		);
 		return;
 	}
@@ -195,7 +203,7 @@ export function getGithubRemoteInfo(repository: Repository): IGithubRemoteInfo |
 }
 
 function parseGithubRemoteInfoFromUrl(githubUrl: string): IGithubRemoteInfo | undefined {
-	const GITHUB_REMOTE_REGEX = /github\.com.(?<owner>[^!@#$%^&*/\\]*)\/(?<repo>[^!@#$%^&*/\\]*)\.git/;
+	const GITHUB_REMOTE_REGEX = /github\.com.(?<owner>[^!@#$%^&*/\\]*)\/(?<repo>[^!@#$%^&*/\\]*)(\.git)?/;
 	if (githubUrl) {
 		const matches = githubUrl?.match(GITHUB_REMOTE_REGEX);
 		if (matches?.groups) {

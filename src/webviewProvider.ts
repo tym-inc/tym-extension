@@ -113,7 +113,7 @@ export class TymViewProvider implements vscode.WebviewViewProvider {
 					const showDraftBranchModal = tymConfig.get<string>('showDraftBranchModal') ?? true;
 					if (showDraftBranchModal) {
 						const choice = await vscode.window.showInformationMessage(
-							`Tym will be creating a link to your uncommitted changes by pushing to Github. Make sure there are no secret keys in your code. Your draft work can only be accessed and viewed from the shareable link.`,
+							`Tym will be creating a link to your uncommitted changes (including untracked files) by pushing to Github. Make sure there are no secret keys in your code. Your draft work can only be accessed and viewed from the shareable link.`,
 							{ modal: true },
 							'Continue'
 						);
@@ -137,6 +137,7 @@ export class TymViewProvider implements vscode.WebviewViewProvider {
 						const remoteInfo = getGithubRemoteInfo(this._gitRepository!);
 						if (!remoteInfo) {
 							sendTelemetryData('submitQuestionFailed', { reason: 'remoteInfo is undefined' });
+							vscode.window.showErrorMessage('Failed to generate shareable link: unable to detect Github remote.');
 							return;
 						}
 						const { owner, repo } = remoteInfo;

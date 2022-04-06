@@ -2,7 +2,7 @@
 	"name": "tym",
 	"displayName": "Tym",
 	"description": "Share your code context in one-click",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"license": "MIT",
 	"publisher": "tym-inc",
 	"repository": "https://github.com/tym-inc/tym-extension",
