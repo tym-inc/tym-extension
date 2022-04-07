@@ -1,4 +1,5 @@
 import { CancellationToken, CodeActionContext, CodeActionProvider, Command, Range, TextDocument, window } from 'vscode';
+import { getExtensionContext } from './util';
 
 export class TymCodeActionProvider implements CodeActionProvider {
 	constructor(private readonly _extensionActivated: boolean) {}
@@ -11,6 +12,8 @@ export class TymCodeActionProvider implements CodeActionProvider {
 	): Command[] | Thenable<Command[]> {
 		return new Promise((resolve) => {
 			if (!this._extensionActivated) resolve([]);
+			const questionOpen = getExtensionContext('openQuestion');
+			const snippetText = questionOpen ? 'Add Snippet to Question' : 'Ask a Question About Snippet';
 			const selection = window?.activeTextEditor?.selection;
 			if (!selection?.start.isEqual(selection?.end)) {
 				const commands: Command[] = [
@@ -19,7 +22,7 @@ export class TymCodeActionProvider implements CodeActionProvider {
 						command: 'tymExtension.getGithubLink'
 					},
 					{
-						title: 'Add Snippet to Question',
+						title: snippetText,
 						command: 'tymExtension.addCodeSnippet'
 					}
 				];

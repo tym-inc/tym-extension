@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { getDatabase, ref, set, onValue, update } from 'firebase/database';
 import { getAuth } from 'firebase/auth';
 import { getGithubRemoteInfo, getSelectionInfo, ISelectionInfo } from './link';
-import { generateMarkdownString, getNonce, identifyUser, sendTelemetryData } from './util';
+import { generateMarkdownString, getNonce, identifyUser, sendTelemetryData, setExtensionContext } from './util';
 import { Repository } from './git';
 import * as fs from 'fs';
 import * as cp from 'child_process';
@@ -23,7 +23,7 @@ export class TymViewProvider implements vscode.WebviewViewProvider {
 
 	constructor(private readonly _extensionUri: vscode.Uri, private readonly _gitRepository?: Repository) {
 		// register command to add code snippet
-		vscode.commands.registerCommand('tymExtension.addCodeSnippet', () => {
+		const addCodeSnippet = () => {
 			sendTelemetryData('addCodeSnippet');
 			// first jump to the webview
 			vscode.commands.executeCommand('workbench.view.extension.tym');
@@ -32,7 +32,9 @@ export class TymViewProvider implements vscode.WebviewViewProvider {
 				// send code snippet to the webview
 				this._addCodeSnippet(selectionInfo);
 			}
-		});
+		};
+		vscode.commands.registerCommand('tymExtension.addCodeSnippet', addCodeSnippet);
+		vscode.commands.registerCommand('tymExtension.addCodeSnippet2', addCodeSnippet);
 
 		const auth = getAuth();
 		const db = getDatabase();
@@ -115,10 +117,11 @@ export class TymViewProvider implements vscode.WebviewViewProvider {
 						const choice = await vscode.window.showInformationMessage(
 							`Tym will be creating a link to your uncommitted changes (including untracked files) by pushing to Github. Make sure there are no secret keys in your code. Your draft work can only be accessed and viewed from the shareable link.`,
 							{ modal: true },
-							'Continue'
+							'Continue',
+							"Don't Show Again"
 						);
-						if (choice !== 'Continue') return;
-						tymConfig.update('showDraftBranchModal', false, true);
+						if (choice === undefined) return;
+						if (choice === "Don't Show Again") tymConfig.update('showDraftBranchModal', false, true);
 					}
 					const { description, terminalOutput, codeSnippets } = data.value;
 					const db = getDatabase();
@@ -203,6 +206,10 @@ export class TymViewProvider implements vscode.WebviewViewProvider {
 					vscode.window.showInformationMessage('Shareable link copied!');
 					vscode.env.openExternal(vscode.Uri.parse(data.value));
 					break;
+				}
+				case 'setOpenQuestion': {
+					vscode.commands.executeCommand('setContext', 'tym.openQuestion', data.value);
+					setExtensionContext('openQuestion', data.value);
 				}
 			}
 		});

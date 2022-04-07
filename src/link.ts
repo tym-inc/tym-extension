@@ -1,6 +1,7 @@
 import { API, Remote, Repository } from './git';
 import * as vscode from 'vscode';
 import { sendTelemetryData } from './util';
+import * as gitURLParser from 'github-url-from-git';
 
 interface IGithubRemoteInfo {
 	owner: string;
@@ -25,22 +26,38 @@ export async function getGithubLink(repository?: Repository): Promise<void> {
 	sendTelemetryData('getGithubLink called');
 	const selectionInfo = getSelectionInfo(repository);
 	if (!selectionInfo) {
-		sendTelemetryData('getGithubLink failed: no selectionInfo');
+		sendTelemetryData('getGithubLink failed', { reason: 'selectionInfo is undefined' });
 		return;
 	}
 	const githubRemoteInfo = getGithubRemoteInfo(repository!);
 	if (!githubRemoteInfo) {
-		sendTelemetryData('getGithubLink failed: remoteInfo undefined.', { githubRemoteInfo });
+		sendTelemetryData('getGithubLink failed', { reason: 'remoteInfo is undefined' });
 		vscode.window.showErrorMessage('Failed to generate Github link: unable to detect Github remote.');
 		return;
 	}
 	const branch = repository!.state.HEAD?.name;
 	const upstream = repository!.state.HEAD?.upstream;
+	const ahead = repository!.state.HEAD?.ahead;
 	const isCommitted = await isSelectionCommitted(repository!, selectionInfo);
-	if (!isCommitted || !branch || !upstream) {
+	if (!isCommitted) {
 		vscode.window.showErrorMessage(
-			'Failed to generate Github link: selected text is not committed yet or the current branch has no corresponding upstream branch on Github. You can use add snippet to question instead'
+			'Failed to generate Github link: selected text is not committed yet. You can use add snippet to question instead'
 		);
+		sendTelemetryData('getGithubLink failed', { reason: 'selection includes uncommitted code' });
+		return;
+	}
+	if (!upstream) {
+		vscode.window.showErrorMessage(
+			'Failed to generate Github link: the current branch has no corresponding upstream on Github. You can use add snippet to question instead'
+		);
+		sendTelemetryData('getGithubLink failed', { reason: 'HEAD has no corresponding upstream' });
+		return;
+	}
+	if (ahead) {
+		vscode.window.showErrorMessage(
+			'Failed to generate Github link: the current workspace has commits that are not pushed to Github. You can either push first or use add snippet to question instead'
+		);
+		sendTelemetryData('getGithubLink failed', { reason: 'HEAD is ahead of upstream' });
 		return;
 	}
 	const adjustedSelectionInfo = await adjustSelectionLines(repository!, selectionInfo);
@@ -202,16 +219,12 @@ export function getGithubRemoteInfo(repository: Repository): IGithubRemoteInfo |
 	return undefined;
 }
 
-function parseGithubRemoteInfoFromUrl(githubUrl: string): IGithubRemoteInfo | undefined {
-	const GITHUB_REMOTE_REGEX = /github\.com.(?<owner>[^!@#$%^&*/\\]*)\/(?<repo>[^!@#$%^&*/\\]*)(\.git)?/;
-	if (githubUrl) {
-		const matches = githubUrl?.match(GITHUB_REMOTE_REGEX);
-		if (matches?.groups) {
-			const { owner, repo } = matches.groups;
-			return { owner, repo };
-		}
-	}
-	return undefined;
+function parseGithubRemoteInfoFromUrl(gitUrl: string): IGithubRemoteInfo {
+	const githubUrlParts = gitURLParser(gitUrl).split('/');
+	console.log('parts', githubUrlParts);
+	const owner = githubUrlParts[githubUrlParts.length - 2];
+	const repo = githubUrlParts[githubUrlParts.length - 1];
+	return { owner, repo };
 }
 
 function findOriginRemote(remotes: Remote[]): Remote | undefined {

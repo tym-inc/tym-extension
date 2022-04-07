@@ -24,6 +24,10 @@
 			},
 			{
 				"command": "tymExtension.addCodeSnippet",
+				"title": "Ask a Question About Snippet"
+			},
+			{
+				"command": "tymExtension.addCodeSnippet2",
 				"title": "Add Snippet to Question"
 			}
 		],
@@ -53,8 +57,13 @@
 					"group": "6_copypath"
 				},
 				{
-					"when": "tym.active && editorFocus",
+					"when": "tym.active && !tym.openQuestion && editorFocus",
 					"command": "tymExtension.addCodeSnippet",
+					"group": "6_copypath"
+				},
+				{
+					"when": "tym.active && tym.openQuestion && editorFocus",
+					"command": "tymExtension.addCodeSnippet2",
 					"group": "6_copypath"
 				}
 			]
@@ -91,6 +100,7 @@
 		"watch": "tsc -watch -p ./"
 	},
 	"devDependencies": {
+		"@types/github-url-from-git": "^1.5.1",
 		"@types/node": "^12.12.0",
 		"@types/vscode": "^1.60.0",
 		"@typescript-eslint/eslint-plugin": "^4.16.0",
@@ -101,6 +111,7 @@
 	},
 	"icon": "media/tym-128.png",
 	"dependencies": {
-		"firebase": "^9.6.10"
+		"firebase": "^9.6.10",
+		"github-url-from-git": "^1.5.0"
 	}
 }

@@ -79,6 +79,14 @@ ${terminalOutput}
 	`;
 }
 
+const extensionContext = new Map();
+export function getExtensionContext(key: string) {
+	return extensionContext.get(key);
+}
+export function setExtensionContext(key: string, value: any) {
+	return extensionContext.set(key, value);
+}
+
 const languageMap: { [key: string]: string } = {
 	feature: 'Cucumber',
 	abap: 'abap',

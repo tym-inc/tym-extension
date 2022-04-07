@@ -8,6 +8,7 @@
 		questionInputs: { description: '', terminalOutput: '', codeSnippets: [] }
 	};
 	let { newQuestionStarted, questionInputs } = oldState;
+	vscode.postMessage({ type: 'setOpenQuestion', value: newQuestionStarted });
 	// Get questions
 	vscode.postMessage({ type: 'getAskedQuestions' });
 
@@ -51,7 +52,7 @@
 		createQuestionBtn.style = 'display: none';
 		newQuestionDiv.style = 'display: block';
 		newQuestionStarted = true;
-		vscode.commands.executeCommand('setContext', 'tym.openQuestion', true);
+		vscode.postMessage({ type: 'setOpenQuestion', value: true });
 		vscode.setState({ newQuestionStarted, questionInputs });
 	}
 
@@ -67,7 +68,7 @@
 		setCodeSnippets([]);
 		newQuestionStarted = false;
 		questionInputs = { description: '', terminalOutput: '', codeSnippets: [] };
-		vscode.commands.executeCommand('setContext', 'tym.openQuestion', false);
+		vscode.postMessage({ type: 'setOpenQuestion', value: false });
 		vscode.setState({ newQuestionStarted, questionInputs });
 	}
 
