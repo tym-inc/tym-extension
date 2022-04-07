@@ -98,7 +98,10 @@ export class TymViewProvider implements vscode.WebviewViewProvider {
 							'Continue',
 							"Don't Show Again"
 						);
-						if (choice === undefined) return;
+						if (choice === undefined) {
+							this._view?.webview.postMessage({ type: 'submitQuestionError' });
+							return;
+						}
 						if (choice === "Don't Show Again") tymConfig.update('showDraftBranchModal', false, true);
 					}
 					const { description, terminalOutput, codeSnippets } = data.value;
@@ -110,12 +113,14 @@ export class TymViewProvider implements vscode.WebviewViewProvider {
 					const gitIndexLocation = `${gitRepoRoot}/.git/index`;
 					if (!parentCommitId) {
 						sendTelemetryData('submitQuestionFailed', { reason: 'parentCommitId is undefined' });
+						this._view?.webview.postMessage({ type: 'submitQuestionError' });
 						return;
 					}
 					const remoteInfo = getGithubRemoteInfo(this._gitRepository!);
 					if (!remoteInfo) {
 						sendTelemetryData('submitQuestionFailed', { reason: 'remoteInfo is undefined' });
 						vscode.window.showErrorMessage('Failed to generate shareable link: unable to detect Github remote.');
+						this._view?.webview.postMessage({ type: 'submitQuestionError' });
 						return;
 					}
 					const { owner, repo } = remoteInfo;

@@ -10,7 +10,12 @@ button.submit-question-btn:hover {
 	background-color: rgb(21, 146, 21);
 }
 
-.new-question, 
+button.submit-question-btn:disabled {
+	background-color: rgb(60, 82, 60);
+	cursor: default;
+}
+
+.new-question,
 .asked-question {
 	padding: 0.7rem;
 	border-style: solid;
@@ -68,8 +73,6 @@ button.xout-btn:hover {
 .snippet-context {
 	margin-top: 0.2rem;
 }
-
-
 
 .snippet-code,
 .asked-description,

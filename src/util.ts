@@ -73,7 +73,7 @@ ${description}
 ${codeMarkdown}
 
 ### Terminal Output
-\`\`\`\`
+\`\`\`\`bash
 ${terminalOutput}
 \`\`\`\`
 	`;

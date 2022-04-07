@@ -15,8 +15,6 @@
 
 	vscode.postMessage({ type: 'getRepoId' });
 
-	const emptyQuestion = { description: '', terminalOutput: '', codeSnippets: [] };
-
 	function setRepoId(repoId) {
 		const oldState = vscode.getState() || {};
 		const repoState = oldState[repoId] || { questions: {} };
@@ -36,6 +34,12 @@
 					vscode.setState({ ...oldState, [repoId]: { questions } });
 					closeNewQuestion(); // sets newQuestion to be undefined
 					setAskedQuestions(questions);
+					submitQuestionBtn.removeAttribute('disabled');
+					submitQuestionBtn.textContent = 'Done';
+					break;
+				case 'submitQuestionError':
+					submitQuestionBtn.removeAttribute('disabled');
+					submitQuestionBtn.textContent = 'Done';
 					break;
 			}
 		});
@@ -63,7 +67,7 @@
 		function openNewQuestion() {
 			createQuestionBtn.style = 'display: none';
 			newQuestionDiv.style = 'display: block';
-			newQuestion = { ...emptyQuestion };
+			newQuestion = { description: '', terminalOutput: '', codeSnippets: [] };
 			vscode.postMessage({ type: 'setOpenQuestion', value: true });
 			vscode.setState({ ...oldState, [repoId]: { questions, newQuestion } });
 		}
@@ -88,6 +92,8 @@
 		};
 
 		submitQuestionBtn.onclick = () => {
+			submitQuestionBtn.setAttribute('disabled', true);
+			submitQuestionBtn.textContent = 'Submitting...';
 			vscode.postMessage({ type: 'submitQuestion', value: newQuestion });
 		};
 
