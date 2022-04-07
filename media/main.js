@@ -2,131 +2,142 @@
 // It cannot access the main VS Code APIs directly.
 (function () {
 	const vscode = acquireVsCodeApi();
-
-	const oldState = vscode.getState() || {
-		newQuestionStarted: false,
-		questionInputs: { description: '', terminalOutput: '', codeSnippets: [] }
-	};
-	let { newQuestionStarted, questionInputs } = oldState;
-	vscode.postMessage({ type: 'setOpenQuestion', value: newQuestionStarted });
-	// Get questions
-	vscode.postMessage({ type: 'getAskedQuestions' });
-
 	// Handle messages sent from the extension to the webview
 	window.addEventListener('message', (event) => {
 		const message = event.data; // The json data that the extension sent
 		switch (message.type) {
-			case 'addCodeSnippet':
-				addCodeSnippet(message.value);
+			case 'setRepoId': {
+				setRepoId(message.value);
 				break;
-			case 'setAskedQuestions':
-				setAskedQuestions(message.value);
-				break;
-			case 'closeNewQuestion':
-				closeNewQuestion();
-				break;
+			}
 		}
 	});
 
-	// For asking new questions
-	const newQuestionDiv = document.querySelector('div.new-question');
-	const createQuestionBtn = document.querySelector('button.create-question-btn');
-	const submitQuestionBtn = newQuestionDiv.querySelector('button.submit-question-btn');
-	const xoutBtn = newQuestionDiv.querySelector('button.xout-btn');
+	vscode.postMessage({ type: 'getRepoId' });
 
-	const descriptionInput = newQuestionDiv.querySelector('textarea.description');
-	const terminalInput = newQuestionDiv.querySelector('textarea.terminal-output');
+	const emptyQuestion = { description: '', terminalOutput: '', codeSnippets: [] };
 
-	const snippetsDiv = newQuestionDiv.querySelector('div.code-snippets');
-	const snippetHint = newQuestionDiv.querySelector('div.snippet-hint');
+	function setRepoId(repoId) {
+		const oldState = vscode.getState() || {};
+		const repoState = oldState[repoId] || { questions: {} };
+		let { questions, newQuestion } = repoState;
+		vscode.postMessage({ type: 'setOpenQuestion', value: !!newQuestion });
+		setAskedQuestions(questions);
 
-	if (newQuestionStarted) {
-		newQuestionDiv.style = 'display: block';
-		createQuestionBtn.style = 'display: none;';
-	} else {
-		newQuestionDiv.style = 'display: none';
-		createQuestionBtn.style = 'display: block;';
-	}
+		window.addEventListener('message', (event) => {
+			const message = event.data; // The json data that the extension sent
+			switch (message.type) {
+				case 'addCodeSnippet':
+					addCodeSnippet(message.value);
+					break;
+				case 'pushedToGithub':
+					const { qid, link } = message.value;
+					questions = { ...questions, [qid]: { ...newQuestion, link, id: qid } };
+					vscode.setState({ ...oldState, [repoId]: { questions } });
+					closeNewQuestion(); // sets newQuestion to be undefined
+					setAskedQuestions(questions);
+					break;
+			}
+		});
 
-	function openNewQuestion() {
-		createQuestionBtn.style = 'display: none';
-		newQuestionDiv.style = 'display: block';
-		newQuestionStarted = true;
-		vscode.postMessage({ type: 'setOpenQuestion', value: true });
-		vscode.setState({ newQuestionStarted, questionInputs });
-	}
+		// For asking new questions
+		const newQuestionDiv = document.querySelector('div.new-question');
+		const createQuestionBtn = document.querySelector('button.create-question-btn');
+		const submitQuestionBtn = newQuestionDiv.querySelector('button.submit-question-btn');
+		const xoutBtn = newQuestionDiv.querySelector('button.xout-btn');
 
-	createQuestionBtn.onclick = () => {
-		openNewQuestion();
-	};
+		const descriptionInput = newQuestionDiv.querySelector('textarea.description');
+		const terminalInput = newQuestionDiv.querySelector('textarea.terminal-output');
 
-	function closeNewQuestion() {
-		createQuestionBtn.style = 'display: block';
-		newQuestionDiv.style = 'display: none';
-		descriptionInput.value = '';
-		terminalInput.value = '';
-		setCodeSnippets([]);
-		newQuestionStarted = false;
-		questionInputs = { description: '', terminalOutput: '', codeSnippets: [] };
-		vscode.postMessage({ type: 'setOpenQuestion', value: false });
-		vscode.setState({ newQuestionStarted, questionInputs });
-	}
+		const snippetsDiv = newQuestionDiv.querySelector('div.code-snippets');
+		const snippetHint = newQuestionDiv.querySelector('div.snippet-hint');
 
-	xoutBtn.onclick = () => {
-		closeNewQuestion();
-	};
-
-	submitQuestionBtn.onclick = () => {
-		vscode.postMessage({ type: 'submitQuestion', value: questionInputs });
-	};
-
-	descriptionInput.value = questionInputs.description;
-	terminalInput.value = questionInputs.terminalOutput;
-
-	descriptionInput.oninput = (event) => {
-		questionInputs.description = event.target.value;
-		vscode.setState({ newQuestionStarted, questionInputs });
-	};
-
-	terminalInput.oninput = (event) => {
-		questionInputs.terminalOutput = event.target.value;
-		vscode.setState({ newQuestionStarted, questionInputs });
-	};
-
-	setCodeSnippets(questionInputs.codeSnippets);
-
-	function addCodeSnippet(snippet) {
-		if (!newQuestionStarted) {
-			openNewQuestion();
-		}
-		questionInputs.codeSnippets.push(snippet);
-		vscode.setState({ newQuestionStarted, questionInputs });
-		setCodeSnippets(questionInputs.codeSnippets);
-	}
-
-	function setCodeSnippets(snippets) {
-		if (snippets.length === 0) {
-			snippetHint.style = 'display: block;';
+		if (newQuestion !== undefined) {
+			newQuestionDiv.style = 'display: block';
+			createQuestionBtn.style = 'display: none;';
 		} else {
-			snippetHint.style = 'display: none;';
+			newQuestionDiv.style = 'display: none';
+			createQuestionBtn.style = 'display: block;';
 		}
 
-		while (snippetsDiv.firstChild) {
-			snippetsDiv.removeChild(snippetsDiv.firstChild);
+		function openNewQuestion() {
+			createQuestionBtn.style = 'display: none';
+			newQuestionDiv.style = 'display: block';
+			newQuestion = { ...emptyQuestion };
+			vscode.postMessage({ type: 'setOpenQuestion', value: true });
+			vscode.setState({ ...oldState, [repoId]: { questions, newQuestion } });
 		}
 
-		for (const i in snippets) {
-			appendSingleSnippet(i, snippets[i], snippetsDiv);
+		createQuestionBtn.onclick = () => {
+			openNewQuestion();
+		};
+
+		function closeNewQuestion() {
+			createQuestionBtn.style = 'display: block';
+			newQuestionDiv.style = 'display: none';
+			descriptionInput.value = '';
+			terminalInput.value = '';
+			setCodeSnippets([]);
+			newQuestion = undefined;
+			vscode.postMessage({ type: 'setOpenQuestion', value: false });
+			vscode.setState({ ...oldState, [repoId]: { questions, newQuestion } });
 		}
-	}
 
-	function appendSingleSnippet(index, snippet, parent, showRemove = true) {
-		const singleSnippetDiv = document.createElement('div');
-		parent.appendChild(singleSnippetDiv);
-		const { relativePath, content, uri, startLine, endLine } = snippet;
-		const clickableFilename = `${relativePath}:${startLine}`;
+		xoutBtn.onclick = () => {
+			closeNewQuestion();
+		};
 
-		singleSnippetDiv.innerHTML = `
+		submitQuestionBtn.onclick = () => {
+			vscode.postMessage({ type: 'submitQuestion', value: newQuestion });
+		};
+
+		descriptionInput.value = newQuestion ? newQuestion.description : '';
+		terminalInput.value = newQuestion ? newQuestion.terminalOutput : '';
+
+		descriptionInput.oninput = (event) => {
+			newQuestion.description = event.target.value;
+			vscode.setState({ ...oldState, [repoId]: { questions, newQuestion } });
+		};
+
+		terminalInput.oninput = (event) => {
+			newQuestion.terminalOutput = event.target.value;
+			vscode.setState({ ...oldState, [repoId]: { questions, newQuestion } });
+		};
+
+		setCodeSnippets(newQuestion ? newQuestion.codeSnippets : []);
+
+		function addCodeSnippet(snippet) {
+			if (newQuestion === undefined) {
+				openNewQuestion(); // sets newQuestion to be emptyQuestion
+			}
+			newQuestion.codeSnippets.push(snippet);
+			vscode.setState({ ...oldState, [repoId]: { questions, newQuestion } });
+			setCodeSnippets(newQuestion.codeSnippets);
+		}
+
+		function setCodeSnippets(snippets) {
+			if (snippets.length === 0) {
+				snippetHint.style = 'display: block;';
+			} else {
+				snippetHint.style = 'display: none;';
+			}
+
+			while (snippetsDiv.firstChild) {
+				snippetsDiv.removeChild(snippetsDiv.firstChild);
+			}
+
+			for (const i in snippets) {
+				appendSingleSnippet(i, snippets[i], snippetsDiv);
+			}
+		}
+
+		function appendSingleSnippet(index, snippet, parent, showRemove = true) {
+			const singleSnippetDiv = document.createElement('div');
+			parent.appendChild(singleSnippetDiv);
+			const { relativePath, content, uri, startLine, endLine } = snippet;
+			const clickableFilename = `${relativePath}:${startLine}`;
+
+			singleSnippetDiv.innerHTML = `
             <div class="snippet-context flex flex-row justify-between">
                 <a class="clickable-link file-location" href="Open in editor">${clickableFilename}</a>
                 ${showRemove ? '<a class="clickable-link remove" href="Remove snippet">Remove</a>' : ''}
@@ -135,41 +146,41 @@
             </div>
         `;
 
-		const codeDiv = singleSnippetDiv.querySelector('div.snippet-code');
-		codeDiv.textContent = content;
+			const codeDiv = singleSnippetDiv.querySelector('div.snippet-code');
+			codeDiv.textContent = content;
 
-		singleSnippetDiv.querySelector('a.clickable-link.file-location').onclick = () => {
-			vscode.postMessage({ type: 'goToLocation', value: { uri, startLine, endLine } });
-		};
-
-		if (showRemove) {
-			singleSnippetDiv.querySelector('a.clickable-link.remove').onclick = () => {
-				questionInputs.codeSnippets.splice(index, 1);
-				vscode.setState({ newQuestionStarted, questionInputs });
-				setCodeSnippets(questionInputs.codeSnippets);
+			singleSnippetDiv.querySelector('a.clickable-link.file-location').onclick = () => {
+				vscode.postMessage({ type: 'goToLocation', value: { uri, startLine, endLine } });
 			};
+
+			if (showRemove) {
+				singleSnippetDiv.querySelector('a.clickable-link.remove').onclick = () => {
+					newQuestion.codeSnippets.splice(index, 1);
+					vscode.setState({ ...oldState, [repoId]: { questions, newQuestion } });
+					setCodeSnippets(newQuestion.codeSnippets);
+				};
+			}
 		}
-	}
 
-	// For setting asked questions
-	function setAskedQuestions(questions) {
-		const askedQuestionsDiv = document.querySelector('div.asked-questions');
-		// clear div
-		while (askedQuestionsDiv.firstChild) {
-			askedQuestionsDiv.removeChild(askedQuestionsDiv.firstChild);
+		// For setting asked questions
+		function setAskedQuestions(questions) {
+			const askedQuestionsDiv = document.querySelector('div.asked-questions');
+			// clear div
+			while (askedQuestionsDiv.firstChild) {
+				askedQuestionsDiv.removeChild(askedQuestionsDiv.firstChild);
+			}
+
+			for (const question of Object.values(questions)) {
+				createQuestionDiv(askedQuestionsDiv, question);
+			}
 		}
 
-		for (const question of questions) {
-			createQuestionDiv(askedQuestionsDiv, question);
-		}
-	}
+		function createQuestionDiv(parent, question) {
+			const questionDiv = document.createElement('div');
+			questionDiv.classList.add('asked-question', 'mt');
+			parent.appendChild(questionDiv);
 
-	function createQuestionDiv(parent, question) {
-		const questionDiv = document.createElement('div');
-		questionDiv.classList.add('asked-question', 'mt');
-		parent.appendChild(questionDiv);
-
-		questionDiv.innerHTML = `
+			questionDiv.innerHTML = `
             <div class="flex flex-col">
                 <div class="flex flex-row justify-between">
                     <h3>Question</h3>
@@ -190,25 +201,30 @@
             </div>
         `;
 
-		const description = questionDiv.querySelector('div.asked-description');
-		const terminal = questionDiv.querySelector('div.asked-terminal-output');
-		const codeSnippets = questionDiv.querySelector('div.code-snippets');
-		const shareLink = questionDiv.querySelector('a.shareable-link');
-		const markAsResolved = questionDiv.querySelector('button.mark-as-resolved');
+			const description = questionDiv.querySelector('div.asked-description');
+			const terminal = questionDiv.querySelector('div.asked-terminal-output');
+			const codeSnippets = questionDiv.querySelector('div.code-snippets');
+			const shareLink = questionDiv.querySelector('a.shareable-link');
+			const markAsResolved = questionDiv.querySelector('button.mark-as-resolved');
 
-		description.textContent = question.description;
-		terminal.textContent = question.terminalOutput;
+			description.textContent = question.description;
+			terminal.textContent = question.terminalOutput;
 
-		for (const i in question.codeSnippets) {
-			appendSingleSnippet(i, question.codeSnippets[i], codeSnippets, false);
+			for (const i in question.codeSnippets) {
+				appendSingleSnippet(i, question.codeSnippets[i], codeSnippets, false);
+			}
+
+			shareLink.onclick = () => {
+				vscode.postMessage({ type: 'copyShareableLink', value: question.link });
+			};
+
+			markAsResolved.onclick = () => {
+				vscode.postMessage({ type: 'markAsResolved', value: question.id });
+				delete questions[question.id];
+				vscode.setState({ ...oldState, [repoId]: { questions, newQuestion } });
+				setAskedQuestions(questions);
+			};
 		}
-
-		shareLink.onclick = () => {
-			vscode.postMessage({ type: 'copyShareableLink', value: question.link });
-		};
-
-		markAsResolved.onclick = () => {
-			vscode.postMessage({ type: 'markAsResolved', value: question.id });
-		};
+		vscode.postMessage({ type: 'setupReady' });
 	}
 })();

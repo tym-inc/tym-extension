@@ -2,7 +2,7 @@
 	"name": "tym",
 	"displayName": "Tym",
 	"description": "Share your code context in one-click",
-	"version": "1.0.2",
+	"version": "1.0.3",
 	"license": "MIT",
 	"publisher": "tym-inc",
 	"repository": "https://github.com/tym-inc/tym-extension",
@@ -34,14 +34,6 @@
 		"configuration": {
 			"title": "Tym",
 			"properties": {
-				"tym.email": {
-					"type": "string",
-					"description": "Email - an identifier for storing the question"
-				},
-				"tym.password": {
-					"type": "string",
-					"description": "Password - a randomly generated password for the email"
-				},
 				"tym.showDraftBranchModal": {
 					"type": "boolean",
 					"default": "true",
@@ -54,17 +46,17 @@
 				{
 					"when": "tym.active && editorFocus",
 					"command": "tymExtension.getGithubLink",
-					"group": "6_copypath"
+					"group": "6_copypath@1"
 				},
 				{
 					"when": "tym.active && !tym.openQuestion && editorFocus",
 					"command": "tymExtension.addCodeSnippet",
-					"group": "6_copypath"
+					"group": "6_copypath@2"
 				},
 				{
 					"when": "tym.active && tym.openQuestion && editorFocus",
 					"command": "tymExtension.addCodeSnippet2",
-					"group": "6_copypath"
+					"group": "6_copypath@3"
 				}
 			]
 		},
@@ -111,7 +103,6 @@
 	},
 	"icon": "media/tym-128.png",
 	"dependencies": {
-		"firebase": "^9.6.10",
 		"github-url-from-git": "^1.5.0",
 		"package.json": "^2.0.1"
 	}

@@ -221,7 +221,6 @@ export function getGithubRemoteInfo(repository: Repository): IGithubRemoteInfo |
 
 function parseGithubRemoteInfoFromUrl(gitUrl: string): IGithubRemoteInfo {
 	const githubUrlParts = gitURLParser(gitUrl).split('/');
-	console.log('parts', githubUrlParts);
 	const owner = githubUrlParts[githubUrlParts.length - 2];
 	const repo = githubUrlParts[githubUrlParts.length - 1];
 	return { owner, repo };

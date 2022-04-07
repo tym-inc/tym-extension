@@ -1,4 +1,3 @@
-import { getAuth } from 'firebase/auth';
 import { ISelectionInfo } from './link';
 import { posthogAnalyticsUrl, posthogApiKey } from './secrets';
 import * as https from 'https';
@@ -46,7 +45,8 @@ function getUserName(): string | undefined {
 }
 
 function getUserEmail(): string | undefined {
-	return getAuth().currentUser?.email ?? undefined;
+	const gitEmail = execSync('git config user.email').toString().trim();
+	return gitEmail.length > 0 ? gitEmail : undefined;
 }
 
 export function generateMarkdownString(
@@ -64,7 +64,7 @@ export function generateMarkdownString(
 		.join('\n');
 
 	return `
-To get started, use the short "Cmd + Shift + V" to preview the markdown. Alternatively, click on the preview button on the top right corner.
+To get started, use the shortcut "⌘ + Shift + V" to preview the markdown. Alternatively, click on the preview button on the top right corner.
 
 ## Question 
 ${description}
